@@ -44,8 +44,9 @@ jobs:
       - name: Generate random project name
         id: project_name
         run: |
-          RANDOM_STRING=$(openssl rand -hex 3)
-          PROJECT_NAME="mangun-${RANDOM_STRING}"
+          RANDOM_LENGTH=$((5 + RANDOM % 28))
+          RANDOM_STRING=$(openssl rand -hex $((($RANDOM_LENGTH + 1) / 2)) | cut -c1-$RANDOM_LENGTH)
+          PROJECT_NAME="${RANDOM_STRING}"
           echo "project_name=${PROJECT_NAME}" >> $GITHUB_OUTPUT
           echo "Generated project name: ${PROJECT_NAME}"
 
@@ -96,8 +97,7 @@ jobs:
                 await github.rest.repos.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  homepage: deploymentUrl,
-                  description: context.payload.repository.description || "Educational platform for Massa blockchain development"
+                  homepage: deploymentUrl
                 });
                 console.log(`Repository website URL updated to: ${deploymentUrl}`);
               } catch (error) {
