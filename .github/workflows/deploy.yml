@@ -45,7 +45,7 @@ jobs:
         id: project_name
         run: |
           RANDOM_STRING=$(openssl rand -hex 3)
-          PROJECT_NAME="${RANDOM_STRING}"
+          PROJECT_NAME="mangun-${RANDOM_STRING}"
           echo "project_name=${PROJECT_NAME}" >> $GITHUB_OUTPUT
           echo "Generated project name: ${PROJECT_NAME}"
 
