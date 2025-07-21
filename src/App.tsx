@@ -10,6 +10,7 @@ interface InvoiceData {
   recipientEmail: string
   amount: string
   currency: string
+  blockchainNetwork: string
   description: string
   walletAddress: string
 }
@@ -20,6 +21,7 @@ function App() {
     recipientEmail: '',
     amount: '',
     currency: 'BTC',
+    blockchainNetwork: '',
     description: '',
     walletAddress: ''
   })
@@ -42,6 +44,7 @@ function App() {
       recipientEmail: '',
       amount: '',
       currency: 'BTC',
+      blockchainNetwork: '',
       description: '',
       walletAddress: ''
     })
@@ -108,17 +111,12 @@ function App() {
                 </div>
                 <div>
                   <Label htmlFor="currency">Currency</Label>
-                  <select
+                  <Input
                     id="currency"
                     value={invoiceData.currency}
                     onChange={(e) => handleInputChange('currency', e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="BTC">Bitcoin (BTC)</option>
-                    <option value="ETH">Ethereum (ETH)</option>
-                    <option value="LTC">Litecoin (LTC)</option>
-                    <option value="ADA">Cardano (ADA)</option>
-                  </select>
+                    placeholder="BTC, ETH, LTC, ADA, etc."
+                  />
                 </div>
               </div>
 
