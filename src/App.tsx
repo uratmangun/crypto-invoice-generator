@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Bitcoin, Wallet, FileText, Download } from 'lucide-react'
+import { Bitcoin, Wallet, FileText, Download, Loader2, AlertCircle } from 'lucide-react'
+import jsPDF from 'jspdf'
 
 interface InvoiceData {
   recipientName: string
@@ -20,13 +21,34 @@ function App() {
     recipientName: '',
     recipientEmail: '',
     amount: '',
-    currency: 'BTC',
+    currency: '',
     blockchainNetwork: '',
     description: '',
     walletAddress: ''
   })
 
   const [generatedInvoice, setGeneratedInvoice] = useState<InvoiceData | null>(null)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
+  // PDF generation configuration
+  const pdfConfig = {
+    orientation: 'portrait' as const,
+    unit: 'mm' as const,
+    format: 'a4' as const,
+    margins: {
+      top: 20,
+      right: 20,
+      bottom: 20,
+      left: 20
+    },
+    fontSize: {
+      title: 18,
+      subtitle: 14,
+      normal: 12,
+      small: 10
+    }
+  }
 
   const handleInputChange = (field: keyof InvoiceData, value: string) => {
     setInvoiceData(prev => ({ ...prev, [field]: value }))
@@ -35,6 +57,127 @@ function App() {
   const generateInvoice = () => {
     if (invoiceData.recipientName && invoiceData.amount && invoiceData.walletAddress) {
       setGeneratedInvoice({ ...invoiceData })
+    }
+  }
+
+  const generatePDF = async () => {
+    if (!generatedInvoice) return
+
+    // Clear any previous errors and set loading state
+    setPdfError(null)
+    setIsGeneratingPDF(true)
+
+    try {
+      // Add a small delay to show loading state for user feedback
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const doc = new jsPDF(pdfConfig.orientation, pdfConfig.unit, pdfConfig.format)
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      // Generate invoice number
+      const invoiceNumber = Date.now().toString().slice(-6)
+
+      // Header
+      doc.setFontSize(pdfConfig.fontSize.title)
+      doc.setFont('helvetica', 'bold')
+      doc.text('CRYPTO INVOICE', pageWidth / 2, pdfConfig.margins.top + 10, { align: 'center' })
+
+      doc.setFontSize(pdfConfig.fontSize.normal)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Invoice #${invoiceNumber}`, pageWidth / 2, pdfConfig.margins.top + 20, { align: 'center' })
+
+      // Date
+      const currentDate = new Date().toLocaleDateString()
+      doc.text(`Date: ${currentDate}`, pageWidth / 2, pdfConfig.margins.top + 30, { align: 'center' })
+
+      let yPosition = pdfConfig.margins.top + 50
+
+      // Recipient Information Section
+      doc.setFontSize(pdfConfig.fontSize.subtitle)
+      doc.setFont('helvetica', 'bold')
+      doc.text('BILL TO:', pdfConfig.margins.left, yPosition)
+      yPosition += 10
+
+      doc.setFontSize(pdfConfig.fontSize.normal)
+      doc.setFont('helvetica', 'normal')
+      doc.text(generatedInvoice.recipientName, pdfConfig.margins.left, yPosition)
+      yPosition += 8
+
+      if (generatedInvoice.recipientEmail) {
+        doc.text(generatedInvoice.recipientEmail, pdfConfig.margins.left, yPosition)
+        yPosition += 8
+      }
+
+      yPosition += 10
+
+      // Payment Details Section
+      doc.setFontSize(pdfConfig.fontSize.subtitle)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PAYMENT DETAILS:', pdfConfig.margins.left, yPosition)
+      yPosition += 10
+
+      doc.setFontSize(pdfConfig.fontSize.normal)
+      doc.setFont('helvetica', 'normal')
+
+      // Amount
+      doc.text('Amount:', pdfConfig.margins.left, yPosition)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`${generatedInvoice.amount} ${generatedInvoice.currency}`, pdfConfig.margins.left + 40, yPosition)
+      doc.setFont('helvetica', 'normal')
+      yPosition += 8
+
+      // Network
+      doc.text('Network:', pdfConfig.margins.left, yPosition)
+      doc.text(generatedInvoice.blockchainNetwork || 'Not specified', pdfConfig.margins.left + 40, yPosition)
+      yPosition += 8
+
+      // Description (if provided)
+      if (generatedInvoice.description) {
+        doc.text('Description:', pdfConfig.margins.left, yPosition)
+        // Handle long descriptions with text wrapping
+        const descriptionLines = doc.splitTextToSize(generatedInvoice.description, pageWidth - pdfConfig.margins.left - pdfConfig.margins.right - 40)
+        doc.text(descriptionLines, pdfConfig.margins.left + 40, yPosition)
+        yPosition += descriptionLines.length * 6 + 2
+      }
+
+      yPosition += 10
+
+      // Wallet Address Section
+      doc.setFontSize(pdfConfig.fontSize.subtitle)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PAYMENT ADDRESS:', pdfConfig.margins.left, yPosition)
+      yPosition += 10
+
+      // Handle long wallet addresses with proper text wrapping
+      doc.setFontSize(pdfConfig.fontSize.small)
+      doc.setFont('courier', 'normal')
+      const maxWidth = pageWidth - pdfConfig.margins.left - pdfConfig.margins.right
+      const addressLines = doc.splitTextToSize(generatedInvoice.walletAddress, maxWidth)
+
+      // Add background rectangle for wallet address
+      const addressHeight = addressLines.length * 4 + 4
+      doc.setFillColor(245, 245, 245)
+      doc.rect(pdfConfig.margins.left, yPosition - 2, maxWidth, addressHeight, 'F')
+
+      doc.setFontSize(12)
+      doc.text(addressLines, pdfConfig.margins.left + 2, yPosition + 2)
+      yPosition += addressHeight + 10
+
+      // Footer
+      doc.setFontSize(pdfConfig.fontSize.small)
+      doc.setFont('helvetica', 'italic')
+      const footerText = 'Please send the exact amount to the specified wallet address on the correct network.'
+      doc.text(footerText, pageWidth / 2, pageHeight - pdfConfig.margins.bottom, { align: 'center' })
+
+      // Save the PDF
+      doc.save(`crypto-invoice-${invoiceNumber}.pdf`)
+
+    } catch (error) {
+      console.error('PDF generation failed:', error)
+      setPdfError('Failed to generate PDF. Please try again.')
+    } finally {
+      setIsGeneratingPDF(false)
     }
   }
 
@@ -49,6 +192,8 @@ function App() {
       walletAddress: ''
     })
     setGeneratedInvoice(null)
+    setPdfError(null)
+    setIsGeneratingPDF(false)
   }
 
   return (
@@ -85,7 +230,7 @@ function App() {
                   placeholder="Enter recipient name"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="recipientEmail">Recipient Email</Label>
                 <Input
@@ -131,6 +276,16 @@ function App() {
               </div>
 
               <div>
+                <Label htmlFor="blockchainNetwork">Blockchain Network</Label>
+                <Input
+                  id="blockchainNetwork"
+                  value={invoiceData.blockchainNetwork}
+                  onChange={(e) => handleInputChange('blockchainNetwork', e.target.value)}
+                  placeholder="e.g., Bitcoin, Ethereum, Polygon, BSC"
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="description">Description (Optional)</Label>
                 <Input
                   id="description"
@@ -170,7 +325,7 @@ function App() {
                       <h3 className="text-xl font-bold">CRYPTO INVOICE</h3>
                       <p className="text-sm text-gray-500">Invoice #{Date.now().toString().slice(-6)}</p>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="font-medium">To:</span>
@@ -184,7 +339,11 @@ function App() {
                       )}
                       <div className="flex justify-between">
                         <span className="font-medium">Amount:</span>
-                        <span className="font-bold">{generatedInvoice.amount} {generatedInvoice.currency}</span>
+                        <span className="font-bold text-lg">{generatedInvoice.amount} {generatedInvoice.currency}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Network:</span>
+                        <span>{generatedInvoice.blockchainNetwork || 'Not specified'}</span>
                       </div>
                       {generatedInvoice.description && (
                         <div className="flex justify-between">
@@ -195,18 +354,49 @@ function App() {
                       <div className="border-t pt-2 mt-4">
                         <div className="text-sm">
                           <span className="font-medium">Payment Address:</span>
-                          <div className="mt-1 p-2 bg-gray-100 rounded text-xs font-mono break-all">
+                          <div className="mt-1 p-4 bg-gray-100 rounded text-lg font-mono break-all">
                             {generatedInvoice.walletAddress}
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <Button className="w-full" variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download PDF
-                  </Button>
+
+                  <div className="space-y-2">
+                    <Button
+                      onClick={generatePDF}
+                      className="w-full"
+                      variant="outline"
+                      disabled={isGeneratingPDF}
+                    >
+                      {isGeneratingPDF ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating PDF...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download PDF
+                        </>
+                      )}
+                    </Button>
+
+                    {pdfError && (
+                      <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>{pdfError}</span>
+                        <Button
+                          onClick={() => setPdfError(null)}
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-6 w-6 p-0 text-red-700 hover:text-red-900"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
